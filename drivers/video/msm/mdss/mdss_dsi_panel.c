@@ -49,8 +49,6 @@ static struct dsi_panel_cmds color_enhance_off_sequence;
 static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 			struct dsi_panel_cmds *pcmds);
 
-extern int set_backlight_pwm(int state);
-
 enum
 {
 	CABC_CLOSE = 0,
@@ -106,7 +104,6 @@ static int mdss_dsi_update_cabc_level(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 	}
 
 done:
-	set_backlight_pwm((pinfo->cabc_available && (pinfo->cabc_mode > 0)) ? 1 : 0);
 
 	return ret;
 }
@@ -156,32 +153,31 @@ int mdss_dsi_panel_update_sre(struct mdss_panel_data *pdata, u32 bl_level)
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct mdss_panel_info *pinfo = NULL;
 
+	int sre = 0;
+	int cabc = 0;
+
 	if (pdata == NULL)
 		return -EINVAL;
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata, panel_data);
 	pinfo = &(ctrl_pdata->panel_data.panel_info);
 
-	if (!pinfo->cabc_mode || !pinfo->cabc_bl_max || !pinfo->sre_bl_threshold)
+	if (!pinfo->cabc_mode)
 		return 0;
 
 	// disable CABC above some backlight value since it's not effective at high
 	// brightness. optionally enable SRE when it's even higher to melt faces off.
-	if ((!pinfo->cabc_active || pinfo->sre_active) && bl_level <= pinfo->cabc_bl_max) {
-		pinfo->cabc_active = true;
-		pinfo->sre_active = false;
+	cabc = pinfo->cabc_mode &&
+			(pinfo->cabc_bl_max <= 0 || bl_level <= pinfo->cabc_bl_max);
+	sre = pinfo->sre_enabled &&
+			(pinfo->sre_bl_threshold <= 0 || bl_level > pinfo->sre_bl_threshold);
+
+	if (cabc != pinfo->cabc_active || sre != pinfo->sre_active) {
+		pinfo->cabc_active = cabc;
+		pinfo->sre_active = sre;
 		ret = mdss_dsi_update_cabc_level(ctrl_pdata);
-	} else if (bl_level > pinfo->cabc_bl_max) {
-		if (pinfo->sre_enabled && !pinfo->sre_active && bl_level >= pinfo->sre_bl_threshold) {
-			pinfo->cabc_active = false;
-			pinfo->sre_active = true;
-			ret = mdss_dsi_update_cabc_level(ctrl_pdata);
-		} else if (pinfo->cabc_active || pinfo->sre_active) {
-			pinfo->cabc_active = false;
-			pinfo->sre_active = false;
-			ret = mdss_dsi_update_cabc_level(ctrl_pdata);
-		}
 	}
+
 	return ret;
 }
 

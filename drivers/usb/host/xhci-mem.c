@@ -2145,7 +2145,7 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 	xhci->rh_bw = kzalloc(sizeof(*xhci->rh_bw)*num_ports, flags);
 	if (!xhci->rh_bw)
 		return -ENOMEM;
-	for (i = 0; i < num_ports && xhci->rh_bw; i++) {
+	for (i = 0; i < num_ports; i++) {
 		struct xhci_interval_bw_table *bw_table;
 
 		INIT_LIST_HEAD(&xhci->rh_bw[i].tts);
